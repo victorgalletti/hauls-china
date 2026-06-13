@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Select,
@@ -25,15 +24,24 @@ import {
 } from "@/components/ui/select";
 import { calculate, isWeightInRange, billedExtraKg } from "@/lib/calc";
 import { formatBRL, formatCNY, formatUSD, formatNum } from "@/lib/format";
-import { getRates, type Rates } from "@/lib/rates";
 import type { ShippingMethodDTO } from "@/lib/shipping";
 
 type WeightUnit = "g" | "kg";
+
+// Manual defaults — the user pays a worse-than-market rate, so these are just
+// editable starting points (¥ per R$ and R$ per US$).
+const DEFAULT_CNY_PER_BRL = "1.23";
+const DEFAULT_USD_BRL = "5.40";
 
 function toNum(v: string): number {
   if (v.trim() === "") return 0;
   const n = Number(v.replace(",", "."));
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Convert "¥ per R$" (how the user thinks) to internal "R$ per ¥". */
+function cnyToBrlFromPerBrl(cnyPerBrl: number): number {
+  return cnyPerBrl > 0 ? 1 / cnyPerBrl : 0;
 }
 
 type FieldProps = {
@@ -104,23 +112,14 @@ function Row({
   );
 }
 
-export function Calculator({
-  methods,
-  initialRates,
-}: {
-  methods: ShippingMethodDTO[];
-  initialRates: Rates;
-}) {
+export function Calculator({ methods }: { methods: ShippingMethodDTO[] }) {
   const [productPriceCny, setProductPriceCny] = useState("");
   const [weightValue, setWeightValue] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("g");
   const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
-  const [cnyToBrl, setCnyToBrl] = useState(String(initialRates.cnyToBrl));
-  const [usdToBrl, setUsdToBrl] = useState(String(initialRates.usdToBrl));
-  const [rateInfo, setRateInfo] = useState({
-    updatedAt: initialRates.updatedAt,
-    live: initialRates.live,
-  });
+  // "¥ por R$" (how the user thinks); converted to R$/¥ for the calc.
+  const [cnyPerBrl, setCnyPerBrl] = useState(DEFAULT_CNY_PER_BRL);
+  const [usdToBrl, setUsdToBrl] = useState(DEFAULT_USD_BRL);
   const [insuranceCny, setInsuranceCny] = useState("0");
   const [importTaxPct, setImportTaxPct] = useState("60");
   const [icmsPct, setIcmsPct] = useState("17");
@@ -128,9 +127,9 @@ export function Calculator({
   const [exemptionEnabled, setExemptionEnabled] = useState(false);
   // Empty string = use the method-derived default declared value.
   const [declaredUsd, setDeclaredUsd] = useState("");
-  const [refreshing, startRefresh] = useTransition();
 
   const weightKg = weightUnit === "g" ? toNum(weightValue) / 1000 : toNum(weightValue);
+  const cnyToBrl = cnyToBrlFromPerBrl(toNum(cnyPerBrl));
   const method = methods.find((m) => m.id === methodId) ?? null;
   const outOfRange = method ? !isWeightInRange(method, weightKg) : false;
 
@@ -140,7 +139,7 @@ export function Calculator({
         method,
         productPriceCny: toNum(productPriceCny),
         weightKg,
-        cnyToBrl: toNum(cnyToBrl),
+        cnyToBrl,
         usdToBrl: toNum(usdToBrl),
         insuranceCny: toNum(insuranceCny),
         importTaxPct: toNum(importTaxPct),
@@ -167,15 +166,6 @@ export function Calculator({
   const extraKg = method
     ? billedExtraKg(weightKg, method.baseWeightKg, method.roundingMode)
     : 0;
-
-  function refreshRates() {
-    startRefresh(async () => {
-      const r = await getRates();
-      setCnyToBrl(String(r.cnyToBrl));
-      setUsdToBrl(String(r.usdToBrl));
-      setRateInfo({ updatedAt: r.updatedAt, live: r.live });
-    });
-  }
 
   return (
     <div className="space-y-4">
@@ -305,15 +295,30 @@ export function Calculator({
             <Separator />
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <NumberField
-                id="cnyBrl"
-                label="Câmbio CNY → BRL"
-                value={cnyToBrl}
-                onChange={setCnyToBrl}
-              />
+              <div className="space-y-1.5">
+                <Label htmlFor="cnyRate">Câmbio do yuan (¥ por R$)</Label>
+                <div className="relative">
+                  <Input
+                    id="cnyRate"
+                    inputMode="decimal"
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={cnyPerBrl}
+                    onChange={(e) => setCnyPerBrl(e.target.value)}
+                    className="pr-14"
+                  />
+                  <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm">
+                    ¥/R$
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  1 ¥ = {formatBRL(cnyToBrl)}
+                </p>
+              </div>
               <NumberField
                 id="usdBrl"
-                label="Câmbio USD → BRL"
+                label="Câmbio do dólar (R$ por US$)"
                 value={usdToBrl}
                 onChange={setUsdToBrl}
               />
@@ -494,41 +499,6 @@ export function Calculator({
           </CardContent>
         </Card>
       </div>
-
-      {/* Exchange rates bar (below the purchase data) */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 py-3 text-sm">
-          <span className="text-muted-foreground">Cotações</span>
-          <span className="tabular-nums">
-            <span className="text-muted-foreground">USD→BRL</span>{" "}
-            {formatNum(toNum(usdToBrl))}
-          </span>
-          <span className="tabular-nums">
-            <span className="text-muted-foreground">CNY→BRL</span>{" "}
-            {formatNum(toNum(cnyToBrl))}
-          </span>
-          <span className="tabular-nums">
-            <span className="text-muted-foreground">CNY→USD</span>{" "}
-            {formatNum(result.cnyToUsd)}
-          </span>
-          <span className="text-muted-foreground text-xs">
-            {rateInfo.live ? "ao vivo" : "offline (padrão)"} ·{" "}
-            {rateInfo.updatedAt?.slice(0, 16).replace("T", " ")}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshRates}
-            disabled={refreshing}
-            className="ml-auto"
-          >
-            <RefreshCw
-              className={refreshing ? "size-4 animate-spin" : "size-4"}
-            />
-            Atualizar
-          </Button>
-        </CardContent>
-      </Card>
 
       <FormulaNote />
     </div>

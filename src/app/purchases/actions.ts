@@ -16,6 +16,7 @@ export type PurchaseItemInput = {
   priceCny: number;
   imageUrl?: string | null;
   link?: string | null;
+  cnyToBrl?: number | null;
   applyMargin: boolean;
 };
 
@@ -119,6 +120,7 @@ function toDTO(p: {
     priceCny: number;
     imageUrl: string | null;
     link: string | null;
+    cnyToBrl: number | null;
     applyMargin: boolean;
   }[];
 }): PurchaseDTO {
@@ -149,6 +151,7 @@ function toDTO(p: {
       priceCny: i.priceCny,
       imageUrl: i.imageUrl,
       link: i.link,
+      cnyToBrl: i.cnyToBrl,
       applyMargin: i.applyMargin,
     })),
   };
@@ -199,6 +202,7 @@ function itemsData(input: PurchaseInput) {
     priceCny: i.priceCny,
     imageUrl: i.imageUrl || null,
     link: i.link?.trim() || null,
+    cnyToBrl: i.cnyToBrl ?? null,
     applyMargin: i.applyMargin,
   }));
 }

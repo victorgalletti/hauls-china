@@ -43,7 +43,6 @@ import {
 } from "@/components/ui/table";
 import { calculatePackage, type PackageItem } from "@/lib/purchase-calc";
 import { formatBRL, formatCNY, formatUSD, formatNum } from "@/lib/format";
-import type { Rates } from "@/lib/rates";
 import type { ShippingMethodDTO } from "@/lib/shipping";
 import {
   uploadImage,
@@ -54,6 +53,11 @@ import {
 
 type WeightUnit = "g" | "kg";
 
+// Manual rate defaults (¥ per R$ and R$ per US$) — editable; the user pays a
+// worse-than-market rate so there is no automatic quote.
+const DEFAULT_CNY_PER_BRL = "1.23";
+const DEFAULT_USD_BRL = "5.40";
+
 type ItemState = {
   id: string;
   name: string;
@@ -62,6 +66,8 @@ type ItemState = {
   weight: string;
   price: string;
   link: string;
+  /** Per-item "¥ por R$" override; "" = use the package rate. */
+  cnyPerBrl: string;
   imageUrl: string | null;
   uploading: boolean;
   applyMargin: boolean;
@@ -73,6 +79,16 @@ function toNum(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** "¥ per R$" → internal "R$ per ¥". */
+function cnyToBrlFromPerBrl(cnyPerBrl: number): number {
+  return cnyPerBrl > 0 ? 1 / cnyPerBrl : 0;
+}
+
+/** internal "R$ per ¥" → "¥ per R$" for display/editing. */
+function perBrlFromCnyToBrl(cnyToBrl: number | null | undefined): string {
+  return cnyToBrl && cnyToBrl > 0 ? String(1 / cnyToBrl) : "";
+}
+
 function newItem(): ItemState {
   return {
     id: crypto.randomUUID(),
@@ -82,6 +98,7 @@ function newItem(): ItemState {
     weight: "",
     price: "",
     link: "",
+    cnyPerBrl: "",
     imageUrl: null,
     uploading: false,
     applyMargin: true,
@@ -90,11 +107,9 @@ function newItem(): ItemState {
 
 export function PurchaseBuilder({
   methods,
-  initialRates,
   purchase,
 }: {
   methods: ShippingMethodDTO[];
-  initialRates: Rates;
   purchase?: PurchaseDTO;
 }) {
   const router = useRouter();
@@ -110,11 +125,12 @@ export function PurchaseBuilder({
   const [weightUnit, setWeightUnit] = useState<WeightUnit>(
     purchase ? "kg" : "g",
   );
-  const [cnyToBrl, setCnyToBrl] = useState(
-    String(purchase?.cnyToBrl ?? initialRates.cnyToBrl),
+  // Package yuan rate as "¥ por R$" (derived from the stored R$/¥ when editing).
+  const [cnyPerBrl, setCnyPerBrl] = useState(
+    purchase ? perBrlFromCnyToBrl(purchase.cnyToBrl) : DEFAULT_CNY_PER_BRL,
   );
   const [usdToBrl, setUsdToBrl] = useState(
-    String(purchase?.usdToBrl ?? initialRates.usdToBrl),
+    purchase ? String(purchase.usdToBrl) : DEFAULT_USD_BRL,
   );
   const [insuranceCny, setInsuranceCny] = useState(
     String(purchase?.insuranceCny ?? 0),
@@ -140,6 +156,7 @@ export function PurchaseBuilder({
           weight: String(i.weightKg),
           price: String(i.priceCny),
           link: i.link ?? "",
+          cnyPerBrl: perBrlFromCnyToBrl(i.cnyToBrl),
           imageUrl: i.imageUrl ?? null,
           uploading: false,
           applyMargin: i.applyMargin,
@@ -150,6 +167,7 @@ export function PurchaseBuilder({
 
   const method = methods.find((m) => m.id === methodId) ?? null;
   const toKg = (w: string) => (weightUnit === "g" ? toNum(w) / 1000 : toNum(w));
+  const packageCnyToBrl = cnyToBrlFromPerBrl(toNum(cnyPerBrl));
 
   const packageItems: PackageItem[] = items.map((i) => ({
     id: i.id,
@@ -159,6 +177,9 @@ export function PurchaseBuilder({
     weightKg: toKg(i.weight),
     priceCny: toNum(i.price),
     link: i.link,
+    // Per-item override only when filled.
+    cnyToBrl:
+      i.cnyPerBrl.trim() === "" ? null : cnyToBrlFromPerBrl(toNum(i.cnyPerBrl)),
     imageUrl: i.imageUrl,
     applyMargin: i.applyMargin,
   }));
@@ -176,7 +197,7 @@ export function PurchaseBuilder({
                 declaredIncludesFreight: method.declaredIncludesFreight,
               }
             : null,
-          cnyToBrl: toNum(cnyToBrl),
+          cnyToBrl: packageCnyToBrl,
           usdToBrl: toNum(usdToBrl),
           insuranceCny: toNum(insuranceCny),
           importTaxPct: toNum(importTaxPct),
@@ -190,7 +211,7 @@ export function PurchaseBuilder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       methodId,
-      cnyToBrl,
+      cnyPerBrl,
       usdToBrl,
       insuranceCny,
       importTaxPct,
@@ -237,7 +258,7 @@ export function PurchaseBuilder({
         extraPricePerKgCny: method.extraPricePerKgCny,
         roundingMode: method.roundingMode,
         declaredIncludesFreight: method.declaredIncludesFreight,
-        cnyToBrl: toNum(cnyToBrl),
+        cnyToBrl: packageCnyToBrl,
         usdToBrl: toNum(usdToBrl),
         insuranceCny: toNum(insuranceCny),
         importTaxPct: toNum(importTaxPct),
@@ -252,6 +273,7 @@ export function PurchaseBuilder({
           weightKg: i.weightKg,
           priceCny: i.priceCny,
           link: i.link,
+          cnyToBrl: i.cnyToBrl,
           imageUrl: i.imageUrl,
           applyMargin: i.applyMargin,
         })),
@@ -338,8 +360,18 @@ export function PurchaseBuilder({
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Câmbio CNY→BRL" value={cnyToBrl} onChange={setCnyToBrl} />
-                <Field label="Câmbio USD→BRL" value={usdToBrl} onChange={setUsdToBrl} />
+                <Field
+                  label="Yuan (¥ por R$)"
+                  suffix="¥/R$"
+                  value={cnyPerBrl}
+                  onChange={setCnyPerBrl}
+                  hint={`1 ¥ = ${formatBRL(packageCnyToBrl)}`}
+                />
+                <Field
+                  label="Dólar (R$ por US$)"
+                  value={usdToBrl}
+                  onChange={setUsdToBrl}
+                />
                 <Field label="Seguro" suffix="CNY" value={insuranceCny} onChange={setInsuranceCny} />
                 <Field label="Imposto imp." suffix="%" value={importTaxPct} onChange={setImportTaxPct} />
                 <Field label="ICMS" suffix="%" value={icmsPct} onChange={setIcmsPct} />
@@ -473,6 +505,22 @@ export function PurchaseBuilder({
                           <ExternalLink className="size-4" />
                         </a>
                       ) : null}
+                    </div>
+                    <div className="relative sm:col-span-2">
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        placeholder="Câmbio próprio do item — ¥ por R$ (opcional)"
+                        value={it.cnyPerBrl}
+                        onChange={(e) =>
+                          updateItem(it.id, { cnyPerBrl: e.target.value })
+                        }
+                        className="pr-14"
+                      />
+                      <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs">
+                        ¥/R$
+                      </span>
                     </div>
                     <label className="text-muted-foreground flex items-center gap-2 text-xs sm:col-span-2">
                       <Switch
@@ -661,11 +709,13 @@ function Field({
   value,
   onChange,
   suffix,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   suffix?: string;
+  hint?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -685,6 +735,7 @@ function Field({
           </span>
         ) : null}
       </div>
+      {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
     </div>
   );
 }

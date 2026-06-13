@@ -70,6 +70,7 @@ model PurchaseItem {
   priceCny    Float
   imageUrl    String?
   link        String? // product page URL
+  cnyToBrl    Float? // optional per-item CNY→BRL override (BRL per CNY); null = use the purchase rate
   // Whether the markup/margin applies to this item (e.g. on for items resold
   // to others, off for your own items).
   applyMargin Boolean @default(true)

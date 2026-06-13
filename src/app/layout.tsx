@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "hauls",
+  title: "Hauls",
   description:
     "Calcule o custo final em BRL de produtos importados de agentes chineses para o Brasil.",
 };
@@ -53,7 +53,7 @@ export default function RootLayout({
                 priority
                 className="size-9 object-contain"
               />
-              <span className="text-lg font-bold tracking-tight">hauls</span>
+              <span className="text-lg font-bold tracking-tight">Hauls</span>
             </Link>
             <Link
               href="/"
