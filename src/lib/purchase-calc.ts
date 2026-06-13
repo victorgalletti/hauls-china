@@ -32,6 +32,8 @@ export type PackageItem = {
   weightKg: number;
   priceCny: number;
   imageUrl?: string | null;
+  /** Whether the markup/margin applies to this item. */
+  applyMargin: boolean;
 };
 
 export type ItemResult = PackageItem & {
@@ -129,8 +131,9 @@ export function calculatePackage(
   const sharedCostBrl = freightBrl + insuranceBrl + importTaxBrl + icmsBrl;
   const subtotalBeforeMargin = goodsBrl + sharedCostBrl;
   const marginMult = 1 + marginPct / 100;
-  const finalTotalBrl = subtotalBeforeMargin * marginMult;
 
+  // Margin is applied per item (only to items flagged for it, e.g. resold to
+  // others), so the package total is the sum of the item finals.
   const itemResults: ItemResult[] = items.map((it) => {
     const share = totalWeightKg > 0 ? (it.weightKg || 0) / totalWeightKg : 0;
     const productBrl = (it.priceCny || 0) * cnyToBrl;
@@ -142,9 +145,11 @@ export function calculatePackage(
       productBrl,
       sharedBrl,
       costBrl,
-      finalBrl: costBrl * marginMult,
+      finalBrl: it.applyMargin ? costBrl * marginMult : costBrl,
     };
   });
+
+  const finalTotalBrl = itemResults.reduce((s, i) => s + i.finalBrl, 0);
 
   // Group per recipient.
   const byPerson = new Map<string, PersonResult>();

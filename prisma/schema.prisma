@@ -63,10 +63,13 @@ model PurchaseItem {
   purchaseId String
   purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 
-  name     String
-  category String?
-  person   String? // who the item is for
-  weightKg Float
-  priceCny Float
-  imageUrl String?
+  name        String
+  category    String?
+  person      String? // who the item is for
+  weightKg    Float
+  priceCny    Float
+  imageUrl    String?
+  // Whether the markup/margin applies to this item (e.g. on for items resold
+  // to others, off for your own items).
+  applyMargin Boolean @default(true)
 }

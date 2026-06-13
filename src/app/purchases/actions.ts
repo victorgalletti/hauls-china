@@ -15,6 +15,7 @@ export type PurchaseItemInput = {
   weightKg: number;
   priceCny: number;
   imageUrl?: string | null;
+  applyMargin: boolean;
 };
 
 export type PurchaseInput = {
@@ -116,6 +117,7 @@ function toDTO(p: {
     weightKg: number;
     priceCny: number;
     imageUrl: string | null;
+    applyMargin: boolean;
   }[];
 }): PurchaseDTO {
   return {
@@ -144,6 +146,7 @@ function toDTO(p: {
       weightKg: i.weightKg,
       priceCny: i.priceCny,
       imageUrl: i.imageUrl,
+      applyMargin: i.applyMargin,
     })),
   };
 }
@@ -185,6 +188,7 @@ export async function createPurchase(input: PurchaseInput): Promise<ActionResult
             weightKg: i.weightKg,
             priceCny: i.priceCny,
             imageUrl: i.imageUrl || null,
+            applyMargin: i.applyMargin,
           })),
         },
       },

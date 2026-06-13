@@ -51,6 +51,7 @@ type ItemState = {
   price: string;
   imageUrl: string | null;
   uploading: boolean;
+  applyMargin: boolean;
 };
 
 function toNum(v: string): number {
@@ -69,6 +70,7 @@ function newItem(): ItemState {
     price: "",
     imageUrl: null,
     uploading: false,
+    applyMargin: true,
   };
 }
 
@@ -105,6 +107,7 @@ export function PurchaseBuilder({
     weightKg: toKg(i.weight),
     priceCny: toNum(i.price),
     imageUrl: i.imageUrl,
+    applyMargin: i.applyMargin,
   }));
 
   const result = useMemo(
@@ -196,6 +199,7 @@ export function PurchaseBuilder({
           weightKg: i.weightKg,
           priceCny: i.priceCny,
           imageUrl: i.imageUrl,
+          applyMargin: i.applyMargin,
         })),
       });
       if (res.ok) {
@@ -384,6 +388,15 @@ export function PurchaseBuilder({
                         </span>
                       </div>
                     </div>
+                    <label className="text-muted-foreground flex items-center gap-2 text-xs sm:col-span-2">
+                      <Switch
+                        checked={it.applyMargin}
+                        onCheckedChange={(v) =>
+                          updateItem(it.id, { applyMargin: v })
+                        }
+                      />
+                      Aplicar margem neste item (desligue para itens seus)
+                    </label>
                   </div>
                   <Button
                     variant="ghost"
@@ -504,6 +517,11 @@ export function PurchaseBuilder({
                       {i.category ? (
                         <Badge variant="secondary" className="ml-2">
                           {i.category}
+                        </Badge>
+                      ) : null}
+                      {!i.applyMargin ? (
+                        <Badge variant="outline" className="ml-2">
+                          sem margem
                         </Badge>
                       ) : null}
                     </TableCell>
