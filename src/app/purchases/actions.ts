@@ -15,6 +15,7 @@ export type PurchaseItemInput = {
   weightKg: number;
   priceCny: number;
   imageUrl?: string | null;
+  link?: string | null;
   applyMargin: boolean;
 };
 
@@ -117,6 +118,7 @@ function toDTO(p: {
     weightKg: number;
     priceCny: number;
     imageUrl: string | null;
+    link: string | null;
     applyMargin: boolean;
   }[];
 }): PurchaseDTO {
@@ -146,6 +148,7 @@ function toDTO(p: {
       weightKg: i.weightKg,
       priceCny: i.priceCny,
       imageUrl: i.imageUrl,
+      link: i.link,
       applyMargin: i.applyMargin,
     })),
   };
@@ -159,44 +162,81 @@ export async function listPurchases(): Promise<PurchaseDTO[]> {
   return rows.map(toDTO);
 }
 
+export async function getPurchase(id: string): Promise<PurchaseDTO | null> {
+  const p = await prisma.purchase.findUnique({
+    where: { id },
+    include: { items: true },
+  });
+  return p ? toDTO(p) : null;
+}
+
+function purchaseData(input: PurchaseInput) {
+  return {
+    name: input.name.trim(),
+    methodName: input.methodName,
+    baseWeightKg: input.baseWeightKg,
+    basePriceCny: input.basePriceCny,
+    extraPricePerKgCny: input.extraPricePerKgCny,
+    roundingMode: input.roundingMode,
+    declaredIncludesFreight: input.declaredIncludesFreight,
+    cnyToBrl: input.cnyToBrl,
+    usdToBrl: input.usdToBrl,
+    insuranceCny: input.insuranceCny,
+    importTaxPct: input.importTaxPct,
+    icmsPct: input.icmsPct,
+    marginPct: input.marginPct,
+    exemptionEnabled: input.exemptionEnabled,
+    declaredValueUsd: input.declaredValueUsd,
+  };
+}
+
+function itemsData(input: PurchaseInput) {
+  return input.items.map((i) => ({
+    name: i.name.trim() || "Item",
+    category: i.category?.trim() || null,
+    person: i.person?.trim() || null,
+    weightKg: i.weightKg,
+    priceCny: i.priceCny,
+    imageUrl: i.imageUrl || null,
+    link: i.link?.trim() || null,
+    applyMargin: i.applyMargin,
+  }));
+}
+
 export async function createPurchase(input: PurchaseInput): Promise<ActionResult> {
   if (!input.name?.trim()) return { ok: false, error: "Dê um nome à compra" };
   if (!input.items?.length) return { ok: false, error: "Adicione ao menos um item" };
   try {
     const created = await prisma.purchase.create({
-      data: {
-        name: input.name.trim(),
-        methodName: input.methodName,
-        baseWeightKg: input.baseWeightKg,
-        basePriceCny: input.basePriceCny,
-        extraPricePerKgCny: input.extraPricePerKgCny,
-        roundingMode: input.roundingMode,
-        declaredIncludesFreight: input.declaredIncludesFreight,
-        cnyToBrl: input.cnyToBrl,
-        usdToBrl: input.usdToBrl,
-        insuranceCny: input.insuranceCny,
-        importTaxPct: input.importTaxPct,
-        icmsPct: input.icmsPct,
-        marginPct: input.marginPct,
-        exemptionEnabled: input.exemptionEnabled,
-        declaredValueUsd: input.declaredValueUsd,
-        items: {
-          create: input.items.map((i) => ({
-            name: i.name.trim() || "Item",
-            category: i.category?.trim() || null,
-            person: i.person?.trim() || null,
-            weightKg: i.weightKg,
-            priceCny: i.priceCny,
-            imageUrl: i.imageUrl || null,
-            applyMargin: i.applyMargin,
-          })),
-        },
-      },
+      data: { ...purchaseData(input), items: { create: itemsData(input) } },
     });
     revalidatePath("/purchases");
     return { ok: true, id: created.id };
   } catch {
     return { ok: false, error: "Não foi possível salvar a compra" };
+  }
+}
+
+export async function updatePurchase(
+  id: string,
+  input: PurchaseInput,
+): Promise<ActionResult> {
+  if (!input.name?.trim()) return { ok: false, error: "Dê um nome à compra" };
+  if (!input.items?.length) return { ok: false, error: "Adicione ao menos um item" };
+  try {
+    // Replace the items wholesale, then update the package fields.
+    await prisma.$transaction([
+      prisma.purchaseItem.deleteMany({ where: { purchaseId: id } }),
+      prisma.purchase.update({
+        where: { id },
+        data: { ...purchaseData(input), items: { create: itemsData(input) } },
+      }),
+    ]);
+    revalidatePath("/purchases");
+    revalidatePath(`/purchases/${id}`);
+    return { ok: true, id };
+  } catch {
+    return { ok: false, error: "Não foi possível atualizar a compra" };
   }
 }
 

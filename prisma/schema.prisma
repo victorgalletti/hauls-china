@@ -69,6 +69,7 @@ model PurchaseItem {
   weightKg    Float
   priceCny    Float
   imageUrl    String?
+  link        String? // product page URL
   // Whether the markup/margin applies to this item (e.g. on for items resold
   // to others, off for your own items).
   applyMargin Boolean @default(true)

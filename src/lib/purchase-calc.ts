@@ -32,6 +32,7 @@ export type PackageItem = {
   weightKg: number;
   priceCny: number;
   imageUrl?: string | null;
+  link?: string | null;
   /** Whether the markup/margin applies to this item. */
   applyMargin: boolean;
 };
@@ -44,13 +45,17 @@ export type ItemResult = PackageItem & {
   sharedBrl: number;
   /** productBrl + sharedBrl (BRL). */
   costBrl: number;
-  /** costBrl × (1 + margin). */
+  /** costBrl × (1 + margin) when margin applies, else costBrl. */
   finalBrl: number;
+  /** finalBrl − costBrl (the markup portion, 0 when margin is off). */
+  marginBrl: number;
 };
 
 export type PersonResult = {
   person: string;
   weightKg: number;
+  costBrl: number;
+  marginBrl: number;
   finalBrl: number;
   itemCount: number;
 };
@@ -71,6 +76,8 @@ export type PackageResult = {
   sharedCostBrl: number;
   goodsBrl: number;
   subtotalBeforeMargin: number;
+  /** Total markup added across all items (sum of per-item margins). */
+  totalMarginBrl: number;
   finalTotalBrl: number;
   items: ItemResult[];
   people: PersonResult[];
@@ -139,17 +146,20 @@ export function calculatePackage(
     const productBrl = (it.priceCny || 0) * cnyToBrl;
     const sharedBrl = sharedCostBrl * share;
     const costBrl = productBrl + sharedBrl;
+    const finalBrl = it.applyMargin ? costBrl * marginMult : costBrl;
     return {
       ...it,
       share,
       productBrl,
       sharedBrl,
       costBrl,
-      finalBrl: it.applyMargin ? costBrl * marginMult : costBrl,
+      finalBrl,
+      marginBrl: finalBrl - costBrl,
     };
   });
 
   const finalTotalBrl = itemResults.reduce((s, i) => s + i.finalBrl, 0);
+  const totalMarginBrl = itemResults.reduce((s, i) => s + i.marginBrl, 0);
 
   // Group per recipient.
   const byPerson = new Map<string, PersonResult>();
@@ -157,8 +167,10 @@ export function calculatePackage(
     const person = it.person?.trim() || "Sem destinatário";
     const cur =
       byPerson.get(person) ??
-      { person, weightKg: 0, finalBrl: 0, itemCount: 0 };
+      { person, weightKg: 0, costBrl: 0, marginBrl: 0, finalBrl: 0, itemCount: 0 };
     cur.weightKg += it.weightKg || 0;
+    cur.costBrl += it.costBrl;
+    cur.marginBrl += it.marginBrl;
     cur.finalBrl += it.finalBrl;
     cur.itemCount += 1;
     byPerson.set(person, cur);
@@ -179,6 +191,7 @@ export function calculatePackage(
     sharedCostBrl,
     goodsBrl,
     subtotalBeforeMargin,
+    totalMarginBrl,
     finalTotalBrl,
     items: itemResults,
     people: Array.from(byPerson.values()).sort((a, b) =>

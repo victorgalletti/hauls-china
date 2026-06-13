@@ -26,6 +26,7 @@ import {
 import { calculatePackage } from "@/lib/purchase-calc";
 import { formatBRL, formatNum } from "@/lib/format";
 import { deletePurchase, type PurchaseDTO } from "@/app/purchases/actions";
+import { cn } from "@/lib/utils";
 
 export function PurchasesList({ purchases }: { purchases: PurchaseDTO[] }) {
   return (
@@ -90,16 +91,20 @@ function PurchaseCard({ purchase: p }: { purchase: PurchaseDTO }) {
   const thumbs = p.items.filter((i) => i.imageUrl).slice(0, 5);
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between gap-2">
-        <div>
-          <CardTitle className="text-base">{p.name}</CardTitle>
+    <Card className="relative">
+      <DeleteButton
+        id={p.id}
+        name={p.name}
+        className="absolute top-2 right-2 z-10"
+      />
+      <CardHeader>
+        <Link href={`/purchases/${p.id}`} className="block pr-8">
+          <CardTitle className="text-base hover:underline">{p.name}</CardTitle>
           <p className="text-muted-foreground text-xs">
             {new Date(p.createdAt).toLocaleDateString("pt-BR")} · {p.methodName} ·{" "}
             {p.items.length} item(ns) · {formatNum(result.totalWeightKg)} kg
           </p>
-        </div>
-        <DeleteButton id={p.id} name={p.name} />
+        </Link>
       </CardHeader>
       <CardContent className="space-y-3">
         {thumbs.length > 0 ? (
@@ -149,7 +154,15 @@ function PurchaseCard({ purchase: p }: { purchase: PurchaseDTO }) {
   );
 }
 
-function DeleteButton({ id, name }: { id: string; name: string }) {
+function DeleteButton({
+  id,
+  name,
+  className,
+}: {
+  id: string;
+  name: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -168,7 +181,15 @@ function DeleteButton({ id, name }: { id: string; name: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Excluir compra">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Excluir compra"
+          className={cn(
+            "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+            className,
+          )}
+        >
           <Trash2 className="size-4" />
         </Button>
       </DialogTrigger>

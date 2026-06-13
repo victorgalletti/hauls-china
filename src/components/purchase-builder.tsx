@@ -1,9 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Plus, Trash2, Loader2, ImagePlus, Save } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  ImagePlus,
+  Save,
+  ExternalLink,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -38,7 +45,12 @@ import { calculatePackage, type PackageItem } from "@/lib/purchase-calc";
 import { formatBRL, formatCNY, formatUSD, formatNum } from "@/lib/format";
 import type { Rates } from "@/lib/rates";
 import type { ShippingMethodDTO } from "@/lib/shipping";
-import { uploadImage, createPurchase } from "@/app/purchases/actions";
+import {
+  uploadImage,
+  createPurchase,
+  updatePurchase,
+  type PurchaseDTO,
+} from "@/app/purchases/actions";
 
 type WeightUnit = "g" | "kg";
 
@@ -49,6 +61,7 @@ type ItemState = {
   person: string;
   weight: string;
   price: string;
+  link: string;
   imageUrl: string | null;
   uploading: boolean;
   applyMargin: boolean;
@@ -68,6 +81,7 @@ function newItem(): ItemState {
     person: "",
     weight: "",
     price: "",
+    link: "",
     imageUrl: null,
     uploading: false,
     applyMargin: true,
@@ -77,23 +91,61 @@ function newItem(): ItemState {
 export function PurchaseBuilder({
   methods,
   initialRates,
+  purchase,
 }: {
   methods: ShippingMethodDTO[];
   initialRates: Rates;
+  purchase?: PurchaseDTO;
 }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
-  const [weightUnit, setWeightUnit] = useState<WeightUnit>("g");
-  const [cnyToBrl, setCnyToBrl] = useState(String(initialRates.cnyToBrl));
-  const [usdToBrl, setUsdToBrl] = useState(String(initialRates.usdToBrl));
-  const [insuranceCny, setInsuranceCny] = useState("0");
-  const [importTaxPct, setImportTaxPct] = useState("60");
-  const [icmsPct, setIcmsPct] = useState("17");
-  const [marginPct, setMarginPct] = useState("0");
-  const [exemptionEnabled, setExemptionEnabled] = useState(false);
-  const [declaredUsd, setDeclaredUsd] = useState("");
-  const [items, setItems] = useState<ItemState[]>([newItem()]);
+  const editing = !!purchase;
+  const [name, setName] = useState(purchase?.name ?? "");
+  const [methodId, setMethodId] = useState(
+    () =>
+      (purchase && methods.find((m) => m.name === purchase.methodName)?.id) ||
+      methods[0]?.id ||
+      "",
+  );
+  // Stored item weights are in kg, so edit mode shows kg.
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>(
+    purchase ? "kg" : "g",
+  );
+  const [cnyToBrl, setCnyToBrl] = useState(
+    String(purchase?.cnyToBrl ?? initialRates.cnyToBrl),
+  );
+  const [usdToBrl, setUsdToBrl] = useState(
+    String(purchase?.usdToBrl ?? initialRates.usdToBrl),
+  );
+  const [insuranceCny, setInsuranceCny] = useState(
+    String(purchase?.insuranceCny ?? 0),
+  );
+  const [importTaxPct, setImportTaxPct] = useState(
+    String(purchase?.importTaxPct ?? 60),
+  );
+  const [icmsPct, setIcmsPct] = useState(String(purchase?.icmsPct ?? 17));
+  const [marginPct, setMarginPct] = useState(String(purchase?.marginPct ?? 0));
+  const [exemptionEnabled, setExemptionEnabled] = useState(
+    purchase?.exemptionEnabled ?? false,
+  );
+  const [declaredUsd, setDeclaredUsd] = useState(
+    purchase?.declaredValueUsd != null ? String(purchase.declaredValueUsd) : "",
+  );
+  const [items, setItems] = useState<ItemState[]>(() =>
+    purchase && purchase.items.length
+      ? purchase.items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          category: i.category ?? "",
+          person: i.person ?? "",
+          weight: String(i.weightKg),
+          price: String(i.priceCny),
+          link: i.link ?? "",
+          imageUrl: i.imageUrl ?? null,
+          uploading: false,
+          applyMargin: i.applyMargin,
+        }))
+      : [newItem()],
+  );
   const [saving, startSaving] = useTransition();
 
   const method = methods.find((m) => m.id === methodId) ?? null;
@@ -106,6 +158,7 @@ export function PurchaseBuilder({
     person: i.person,
     weightKg: toKg(i.weight),
     priceCny: toNum(i.price),
+    link: i.link,
     imageUrl: i.imageUrl,
     applyMargin: i.applyMargin,
   }));
@@ -176,7 +229,7 @@ export function PurchaseBuilder({
       return;
     }
     startSaving(async () => {
-      const res = await createPurchase({
+      const input = {
         name,
         methodName: method.name,
         baseWeightKg: method.baseWeightKg,
@@ -198,13 +251,22 @@ export function PurchaseBuilder({
           person: i.person,
           weightKg: i.weightKg,
           priceCny: i.priceCny,
+          link: i.link,
           imageUrl: i.imageUrl,
           applyMargin: i.applyMargin,
         })),
-      });
+      };
+      const res = editing
+        ? await updatePurchase(purchase!.id, input)
+        : await createPurchase(input);
       if (res.ok) {
-        toast.success("Compra salva");
-        router.push("/purchases");
+        toast.success(editing ? "Compra atualizada" : "Compra salva");
+        if (editing) {
+          // Stay on the edit page; just resync server data (form state is kept).
+          router.refresh();
+        } else {
+          router.push("/purchases");
+        }
       } else {
         toast.error(res.error);
       }
@@ -214,7 +276,9 @@ export function PurchaseBuilder({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Nova compra</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {editing ? "Editar compra" : "Nova compra"}
+        </h1>
         <p className="text-muted-foreground text-sm">
           Monte um pacote com vários itens; o frete, seguro e impostos são
           divididos por peso (regra de três) entre os destinatários.
@@ -388,6 +452,28 @@ export function PurchaseBuilder({
                         </span>
                       </div>
                     </div>
+                    <div className="relative sm:col-span-2">
+                      <Input
+                        type="url"
+                        placeholder="Link do produto (opcional)"
+                        value={it.link}
+                        onChange={(e) =>
+                          updateItem(it.id, { link: e.target.value })
+                        }
+                        className={it.link.trim() ? "pr-9" : undefined}
+                      />
+                      {it.link.trim() ? (
+                        <a
+                          href={it.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="Abrir link do produto"
+                          className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-2 flex items-center"
+                        >
+                          <ExternalLink className="size-4" />
+                        </a>
+                      ) : null}
+                    </div>
                     <label className="text-muted-foreground flex items-center gap-2 text-xs sm:col-span-2">
                       <Switch
                         checked={it.applyMargin}
@@ -404,6 +490,7 @@ export function PurchaseBuilder({
                     aria-label="Remover item"
                     onClick={() => removeItem(it.id)}
                     disabled={items.length === 1}
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="size-4" />
                   </Button>
@@ -435,6 +522,13 @@ export function PurchaseBuilder({
                 value={formatBRL(result.importTaxBrl)}
               />
               <SummaryRow label="ICMS" value={formatBRL(result.icmsBrl)} />
+              {result.totalMarginBrl > 0 ? (
+                <SummaryRow
+                  label={`Margem (${formatNum(toNum(marginPct))}%)`}
+                  sub="itens marcados"
+                  value={formatBRL(result.totalMarginBrl)}
+                />
+              ) : null}
               <Separator className="my-1" />
               <SummaryRow
                 label="Total"
@@ -461,7 +555,7 @@ export function PurchaseBuilder({
                   {result.people.map((p) => (
                     <div
                       key={p.person}
-                      className="flex items-center justify-between gap-2 text-sm"
+                      className="flex items-baseline justify-between gap-2 text-sm"
                     >
                       <span>
                         {p.person}{" "}
@@ -469,8 +563,16 @@ export function PurchaseBuilder({
                           ({p.itemCount} · {formatNum(p.weightKg)} kg)
                         </span>
                       </span>
-                      <span className="font-medium tabular-nums">
-                        {formatBRL(p.finalBrl)}
+                      <span className="text-right">
+                        <span className="font-medium tabular-nums">
+                          {formatBRL(p.finalBrl)}
+                        </span>
+                        {p.marginBrl > 0 ? (
+                          <span className="text-muted-foreground block text-xs">
+                            custo {formatBRL(p.costBrl)} + margem{" "}
+                            {formatBRL(p.marginBrl)}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   ))}
@@ -485,7 +587,7 @@ export function PurchaseBuilder({
             ) : (
               <Save className="size-4" />
             )}
-            Salvar compra
+            {editing ? "Salvar alterações" : "Salvar compra"}
           </Button>
         </div>
       </div>
@@ -622,16 +724,45 @@ function ImagePicker({
   uploading: boolean;
   onPick: (file: File) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const imgItem = Array.from(e.clipboardData?.items ?? []).find((i) =>
+      i.type.startsWith("image/"),
+    );
+    const file = imgItem?.getAsFile();
+    if (file) {
+      e.preventDefault();
+      onPick(file);
+    }
+  }
+
   return (
-    <label className="bg-muted/40 hover:bg-muted relative flex size-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border">
-      {uploading ? (
-        <Loader2 className="text-muted-foreground size-5 animate-spin" />
-      ) : url ? (
-        <Image src={url} alt="" fill sizes="80px" className="object-cover" />
-      ) : (
-        <ImagePlus className="text-muted-foreground size-5" />
-      )}
+    <div className="flex w-20 shrink-0 flex-col items-center gap-1">
+      {/* Focusable so a screenshot can be pasted with Ctrl+V. */}
+      <div
+        tabIndex={0}
+        onPaste={handlePaste}
+        title="Clique aqui e cole (Ctrl+V) um print, ou use 'arquivo'"
+        className="bg-muted/40 hover:bg-muted focus-visible:ring-ring relative flex size-20 items-center justify-center overflow-hidden rounded-md border outline-none focus-visible:ring-2"
+      >
+        {uploading ? (
+          <Loader2 className="text-muted-foreground size-5 animate-spin" />
+        ) : url ? (
+          <Image src={url} alt="" fill sizes="80px" className="object-cover" />
+        ) : (
+          <ImagePlus className="text-muted-foreground size-5" />
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="text-muted-foreground hover:text-foreground text-[11px] underline"
+      >
+        arquivo
+      </button>
       <input
+        ref={inputRef}
         type="file"
         accept="image/*"
         className="hidden"
@@ -641,6 +772,6 @@ function ImagePicker({
           e.target.value = "";
         }}
       />
-    </label>
+    </div>
   );
 }

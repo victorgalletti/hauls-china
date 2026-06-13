@@ -462,7 +462,12 @@ function DeleteButton({ id, name }: { id: string; name: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Excluir">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Excluir"
+          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        >
           <Trash2 className="size-4" />
         </Button>
       </DialogTrigger>
