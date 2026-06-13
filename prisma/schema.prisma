@@ -1,0 +1,29 @@
+// Prisma schema for the Import Cost Calculator.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// A stepped/tiered freight pricing method used by the calculator.
+model ShippingMethod {
+  id                 String   @id @default(cuid())
+  name               String
+  baseWeightKg       Float
+  basePriceCny       Float
+  extraPricePerKgCny Float
+  roundingMode       String   @default("ceil") // "ceil" | "linear"
+  minWeightKg        Float    @default(0)
+  maxWeightKg        Float
+  etaDays            String?
+  // When true the declared (taxable) value defaults to product + freight;
+  // when false it defaults to the product value only.
+  declaredIncludesFreight Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
