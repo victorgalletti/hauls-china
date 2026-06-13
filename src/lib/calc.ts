@@ -33,6 +33,8 @@ export type CalcInput = {
   // Exchange rates (3 currencies: CNY, USD, BRL).
   cnyToBrl: number;
   usdToBrl: number;
+  // Insurance premium charged by the agent (CNY), added to what you pay.
+  insuranceCny: number;
   // Tax knobs.
   importTaxPct: number;
   icmsPct: number;
@@ -49,6 +51,7 @@ export type CalcResult = {
   freightCny: number;
   freightBrl: number;
   productBrl: number;
+  insuranceBrl: number;
   // CNY → USD derived rate (cnyToBrl / usdToBrl).
   cnyToUsd: number;
   // The default declared value (USD) implied by the chosen method.
@@ -85,6 +88,7 @@ export function calculate(input: CalcInput): CalcResult {
     weightKg,
     cnyToBrl,
     usdToBrl,
+    insuranceCny,
     importTaxPct,
     icmsPct,
     marginPct,
@@ -97,7 +101,8 @@ export function calculate(input: CalcInput): CalcResult {
   const fCny = method ? freightCny(method, weightKg) : 0;
   const freightBrl = fCny * cnyToBrl;
   const productBrl = productPriceCny * cnyToBrl;
-  const goodsBrl = productBrl + freightBrl;
+  const insuranceBrl = insuranceCny * cnyToBrl;
+  const goodsBrl = productBrl + freightBrl + insuranceBrl;
 
   // Default declared value (USD) from the method's base preference.
   const declaredBaseCny =
@@ -124,6 +129,7 @@ export function calculate(input: CalcInput): CalcResult {
     freightCny: fCny,
     freightBrl,
     productBrl,
+    insuranceBrl,
     cnyToUsd,
     declaredDefaultUsd,
     declaredValueUsd,

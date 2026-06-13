@@ -27,3 +27,46 @@ model ShippingMethod {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
+
+/// A real purchase: one package, possibly shared among several people, whose
+/// freight/insurance/taxes are split by weight (rule of three). Shipping method
+/// pricing is snapshotted so old purchases stay accurate if a method changes.
+model Purchase {
+  id   String @id @default(cuid())
+  name String
+
+  // Shipping method snapshot.
+  methodName              String
+  baseWeightKg            Float
+  basePriceCny            Float
+  extraPricePerKgCny      Float
+  roundingMode            String  @default("ceil")
+  declaredIncludesFreight Boolean @default(false)
+
+  // Calculation parameters at the time of purchase.
+  cnyToBrl         Float
+  usdToBrl         Float
+  insuranceCny     Float   @default(0)
+  importTaxPct     Float   @default(60)
+  icmsPct          Float   @default(17)
+  marginPct        Float   @default(0)
+  exemptionEnabled Boolean @default(false)
+  declaredValueUsd Float? // optional package-level declared value override (USD)
+
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  items     PurchaseItem[]
+}
+
+model PurchaseItem {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  name     String
+  category String?
+  person   String? // who the item is for
+  weightKg Float
+  priceCny Float
+  imageUrl String?
+}

@@ -121,6 +121,7 @@ export function Calculator({
     updatedAt: initialRates.updatedAt,
     live: initialRates.live,
   });
+  const [insuranceCny, setInsuranceCny] = useState("0");
   const [importTaxPct, setImportTaxPct] = useState("60");
   const [icmsPct, setIcmsPct] = useState("17");
   const [marginPct, setMarginPct] = useState("0");
@@ -141,6 +142,7 @@ export function Calculator({
         weightKg,
         cnyToBrl: toNum(cnyToBrl),
         usdToBrl: toNum(usdToBrl),
+        insuranceCny: toNum(insuranceCny),
         importTaxPct: toNum(importTaxPct),
         icmsPct: toNum(icmsPct),
         marginPct: toNum(marginPct),
@@ -153,6 +155,7 @@ export function Calculator({
       weightKg,
       cnyToBrl,
       usdToBrl,
+      insuranceCny,
       importTaxPct,
       icmsPct,
       marginPct,
@@ -335,6 +338,13 @@ export function Calculator({
                 value={marginPct}
                 onChange={setMarginPct}
               />
+              <NumberField
+                id="insurance"
+                label="Seguro"
+                suffix="CNY"
+                value={insuranceCny}
+                onChange={setInsuranceCny}
+              />
             </div>
 
             <Separator />
@@ -421,6 +431,13 @@ export function Calculator({
                   }
                   value={formatBRL(result.freightBrl)}
                 />
+                {toNum(insuranceCny) > 0 ? (
+                  <Row
+                    label="Seguro"
+                    sub={formatCNY(toNum(insuranceCny))}
+                    value={formatBRL(result.insuranceBrl)}
+                  />
+                ) : null}
                 <Row
                   label="Custo das mercadorias"
                   value={formatBRL(result.goodsBrl)}

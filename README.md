@@ -21,13 +21,17 @@ com um CRUD para gerenciar as tabelas de frete (que mudam com o tempo).
 - **Calculadora (`/`)** — recálculo ao vivo conforme você digita:
   - preço do produto (CNY); peso em **gramas ou kg** (alternável)
   - método de envio; câmbios CNY→BRL e USD→BRL
-  - imposto de importação (padrão 60%), ICMS (padrão 17%), margem
+  - imposto de importação (padrão 60%), ICMS (padrão 17%), margem, **seguro** (CNY)
   - **valor declarado (USD) aberto/editável**: por padrão usa o produto (ou
     produto + frete, conforme o método), mas você pode declarar qualquer valor
   - isenção **Remessa Conforme** (até US$50): o imposto incide só sobre a parte
     do valor declarado que excede US$50
   - aviso quando o peso está fora da faixa do método
   - detalhamento completo (produto, frete, declarado, imposto, ICMS, preço final)
+- **Compras (`/purchases`)** — registra um pacote real com **vários itens** (nome,
+  categoria, destinatário, **foto** com upload). Soma os pesos e divide frete,
+  seguro e impostos **por peso (regra de três)**, mostrando quanto cada pessoa
+  paga. Útil quando você compra para irmão/pais/amigos no mesmo pacote.
 - **Métodos de envio (`/shipping-methods`)** — listar, criar, editar e excluir tabelas
   de frete, com validação (`minWeightKg ≤ baseWeightKg ≤ maxWeightKg`, números positivos).
   Cada método define se o **valor declarado inclui o frete** ou só o produto.
