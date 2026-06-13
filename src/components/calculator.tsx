@@ -111,8 +111,8 @@ export function Calculator({
   methods: ShippingMethodDTO[];
   initialRates: Rates;
 }) {
-  const [productPriceCny, setProductPriceCny] = useState("100");
-  const [weightValue, setWeightValue] = useState("500");
+  const [productPriceCny, setProductPriceCny] = useState("");
+  const [weightValue, setWeightValue] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("g");
   const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
   const [cnyToBrl, setCnyToBrl] = useState(String(initialRates.cnyToBrl));

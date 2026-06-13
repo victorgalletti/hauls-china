@@ -98,7 +98,9 @@ export function calculate(input: CalcInput): CalcResult {
 
   const cnyToUsd = usdToBrl > 0 ? cnyToBrl / usdToBrl : 0;
 
-  const fCny = method ? freightCny(method, weightKg) : 0;
+  // No weight entered means nothing to ship yet, so freight stays at zero
+  // instead of showing the method's base price.
+  const fCny = method && weightKg > 0 ? freightCny(method, weightKg) : 0;
   const freightBrl = fCny * cnyToBrl;
   const productBrl = productPriceCny * cnyToBrl;
   const insuranceBrl = insuranceCny * cnyToBrl;

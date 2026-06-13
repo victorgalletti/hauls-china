@@ -105,7 +105,8 @@ export function calculatePackage(
   const totalWeightKg = items.reduce((s, i) => s + (i.weightKg || 0), 0);
   const totalProductCny = items.reduce((s, i) => s + (i.priceCny || 0), 0);
 
-  const freightCny = method ? freightForPackage(method, totalWeightKg) : 0;
+  const freightCny =
+    method && totalWeightKg > 0 ? freightForPackage(method, totalWeightKg) : 0;
   const freightBrl = freightCny * cnyToBrl;
   const insuranceBrl = insuranceCny * cnyToBrl;
   const goodsBrl = totalProductCny * cnyToBrl;
