@@ -81,6 +81,55 @@ Scripts úteis:
 | `pnpm db:seed`   | insere/atualiza os dois métodos de exemplo           |
 | `pnpm db:reset`  | recria o banco do zero e roda o seed                 |
 
+## Rodar com Docker (uso pessoal)
+
+Jeito mais simples de só **ver a aplicação** sem instalar nada além do Docker:
+
+```bash
+docker compose up -d --build      # build + sobe em http://localhost:4090
+docker compose logs -f            # acompanhar os logs
+docker compose down               # parar (mantém os dados)
+docker compose start              # subir de novo depois (sem rebuild)
+```
+
+- Acesse em **http://localhost:4090** (porta 4090 no host → 3000 no container).
+- **Não sobe sozinho** quando o Docker inicia (`restart: "no"`); você controla
+  com `up`/`start`/`stop`.
+- Na primeira subida o container **aplica as migrações** e **popula** os dois
+  métodos de exemplo (só uma vez, via marcador `/data/.seeded`).
+
+Os dados ficam em **volumes nomeados** (confiáveis para SQLite no Windows;
+evitam os problemas de lock de bind mount) e sobrevivem a `down`/restart:
+
+- `hauls-db` → banco SQLite (`/data/dev.db`)
+- `hauls-uploads` → fotos dos itens (`/app/public/uploads`)
+
+Para zerar tudo (apaga banco e fotos): `docker compose down -v`.
+
+### Importar um banco/fotos que você já usava localmente
+
+Se você já rodou com `pnpm dev` e quer trazer os registros (`./dev.db`) e fotos
+(`./public/uploads`) para o Docker, com o container parado:
+
+```bash
+docker compose up -d                       # cria os volumes (1ª vez)
+docker compose down                        # para, mantendo os volumes
+
+# copia o banco existente para o volume e evita re-popular
+docker run --rm -v hauls_hauls-db:/data -v "${PWD}:/host" alpine \
+  sh -c "cp /host/dev.db /data/dev.db && touch /data/.seeded"
+
+# copia as fotos existentes
+docker run --rm -v hauls_hauls-uploads:/up -v "${PWD}/public/uploads:/src" alpine \
+  sh -c "cp -r /src/. /up/"
+
+docker compose up -d                       # agora com seus dados
+```
+
+> Detalhes: imagem multi-stage (Next.js 16 + Prisma 7 com adapter
+> `better-sqlite3`, **sem engine Rust**); `Dockerfile` e `docker-compose.yml` na
+> raiz.
+
 ## Persistência
 
 - O banco é um arquivo SQLite em `./dev.db` (configurável via `DATABASE_URL` no `.env`).

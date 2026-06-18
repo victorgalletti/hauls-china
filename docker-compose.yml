@@ -1,0 +1,19 @@
+services:
+  hauls:
+    build: .
+    image: hauls
+    container_name: hauls
+    ports:
+      - "4090:3000" # acesse em http://localhost:4090
+    environment:
+      - DATABASE_URL=file:/data/dev.db
+      - NODE_ENV=production
+    volumes:
+      - hauls-db:/data # SQLite database
+      - hauls-uploads:/app/public/uploads # item photos
+    # Não sobe sozinho quando o Docker inicia; você controla manualmente.
+    restart: "no"
+
+volumes:
+  hauls-db:
+  hauls-uploads:
