@@ -92,6 +92,11 @@ docker compose down               # parar (mantém os dados)
 docker compose start              # subir de novo depois (sem rebuild)
 ```
 
+Atalhos pnpm (Windows): `pnpm docker:update` (build + sobe — use após mudar o
+código), `pnpm docker:up` / `docker:stop` / `docker:down` / `docker:logs`, e
+`pnpm docker:import-db` / `pnpm docker:export-db` para sincronizar banco+fotos
+entre o `pnpm dev` (host) e o Docker (volumes).
+
 - Acesse em **http://localhost:4090** (porta 4090 no host → 3000 no container).
 - **Não sobe sozinho** quando o Docker inicia (`restart: "no"`); você controla
   com `up`/`start`/`stop`.
