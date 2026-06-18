@@ -18,6 +18,7 @@ export type PurchaseItemInput = {
   link?: string | null;
   cnyToBrl?: number | null;
   applyMargin: boolean;
+  marginPct?: number | null;
 };
 
 export type PurchaseInput = {
@@ -122,6 +123,7 @@ function toDTO(p: {
     link: string | null;
     cnyToBrl: number | null;
     applyMargin: boolean;
+    marginPct: number | null;
   }[];
 }): PurchaseDTO {
   return {
@@ -153,6 +155,7 @@ function toDTO(p: {
       link: i.link,
       cnyToBrl: i.cnyToBrl,
       applyMargin: i.applyMargin,
+      marginPct: i.marginPct,
     })),
   };
 }
@@ -204,6 +207,7 @@ function itemsData(input: PurchaseInput) {
     link: i.link?.trim() || null,
     cnyToBrl: i.cnyToBrl ?? null,
     applyMargin: i.applyMargin,
+    marginPct: i.marginPct ?? null,
   }));
 }
 

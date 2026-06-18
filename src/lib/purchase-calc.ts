@@ -37,6 +37,8 @@ export type PackageItem = {
   cnyToBrl?: number | null;
   /** Whether the markup/margin applies to this item. */
   applyMargin: boolean;
+  /** Optional per-item margin %; null = use the package margin. */
+  marginPct?: number | null;
 };
 
 export type ItemResult = PackageItem & {
@@ -141,16 +143,16 @@ export function calculatePackage(
 
   const sharedCostBrl = freightBrl + insuranceBrl + importTaxBrl + icmsBrl;
   const subtotalBeforeMargin = goodsBrl + sharedCostBrl;
-  const marginMult = 1 + marginPct / 100;
 
-  // Margin is applied per item (only to items flagged for it, e.g. resold to
-  // others), so the package total is the sum of the item finals.
+  // Margin is applied per item: off → 0; on → the item's own % when set, else
+  // the package %. The package total is the sum of the item finals.
   const itemResults: ItemResult[] = items.map((it) => {
     const share = totalWeightKg > 0 ? (it.weightKg || 0) / totalWeightKg : 0;
     const productBrl = (it.priceCny || 0) * rateOf(it);
     const sharedBrl = sharedCostBrl * share;
     const costBrl = productBrl + sharedBrl;
-    const finalBrl = it.applyMargin ? costBrl * marginMult : costBrl;
+    const effMarginPct = it.applyMargin ? (it.marginPct ?? marginPct) : 0;
+    const finalBrl = costBrl * (1 + effMarginPct / 100);
     return {
       ...it,
       share,

@@ -71,6 +71,8 @@ type ItemState = {
   imageUrl: string | null;
   uploading: boolean;
   applyMargin: boolean;
+  /** Per-item margin % override; "" = use the package margin. */
+  marginPct: string;
 };
 
 function toNum(v: string): number {
@@ -102,6 +104,7 @@ function newItem(): ItemState {
     imageUrl: null,
     uploading: false,
     applyMargin: true,
+    marginPct: "",
   };
 }
 
@@ -160,6 +163,7 @@ export function PurchaseBuilder({
           imageUrl: i.imageUrl ?? null,
           uploading: false,
           applyMargin: i.applyMargin,
+          marginPct: i.marginPct != null ? String(i.marginPct) : "",
         }))
       : [newItem()],
   );
@@ -182,6 +186,7 @@ export function PurchaseBuilder({
       i.cnyPerBrl.trim() === "" ? null : cnyToBrlFromPerBrl(toNum(i.cnyPerBrl)),
     imageUrl: i.imageUrl,
     applyMargin: i.applyMargin,
+    marginPct: i.marginPct.trim() === "" ? null : toNum(i.marginPct),
   }));
 
   const result = useMemo(
@@ -276,6 +281,7 @@ export function PurchaseBuilder({
           cnyToBrl: i.cnyToBrl,
           imageUrl: i.imageUrl,
           applyMargin: i.applyMargin,
+          marginPct: i.marginPct,
         })),
       };
       const res = editing
@@ -375,7 +381,7 @@ export function PurchaseBuilder({
                 <Field label="Seguro" suffix="CNY" value={insuranceCny} onChange={setInsuranceCny} />
                 <Field label="Imposto imp." suffix="%" value={importTaxPct} onChange={setImportTaxPct} />
                 <Field label="ICMS" suffix="%" value={icmsPct} onChange={setIcmsPct} />
-                <Field label="Margem" suffix="%" value={marginPct} onChange={setMarginPct} />
+                <Field label="Margem padrão" suffix="%" value={marginPct} onChange={setMarginPct} />
               </div>
 
               <div className="flex flex-wrap items-end gap-4">
@@ -522,15 +528,35 @@ export function PurchaseBuilder({
                         ¥/R$
                       </span>
                     </div>
-                    <label className="text-muted-foreground flex items-center gap-2 text-xs sm:col-span-2">
-                      <Switch
-                        checked={it.applyMargin}
-                        onCheckedChange={(v) =>
-                          updateItem(it.id, { applyMargin: v })
-                        }
-                      />
-                      Aplicar margem neste item (desligue para itens seus)
-                    </label>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:col-span-2">
+                      <label className="text-muted-foreground flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={it.applyMargin}
+                          onCheckedChange={(v) =>
+                            updateItem(it.id, { applyMargin: v })
+                          }
+                        />
+                        Aplicar margem (desligue p/ itens seus)
+                      </label>
+                      {it.applyMargin ? (
+                        <div className="relative w-32">
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            placeholder={`${formatNum(toNum(marginPct))} (compra)`}
+                            value={it.marginPct}
+                            onChange={(e) =>
+                              updateItem(it.id, { marginPct: e.target.value })
+                            }
+                            className="h-8 pr-6 text-xs"
+                          />
+                          <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs">
+                            %
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -572,8 +598,8 @@ export function PurchaseBuilder({
               <SummaryRow label="ICMS" value={formatBRL(result.icmsBrl)} />
               {result.totalMarginBrl > 0 ? (
                 <SummaryRow
-                  label={`Margem (${formatNum(toNum(marginPct))}%)`}
-                  sub="itens marcados"
+                  label="Margem"
+                  sub="soma por item"
                   value={formatBRL(result.totalMarginBrl)}
                 />
               ) : null}
@@ -672,6 +698,10 @@ export function PurchaseBuilder({
                       {!i.applyMargin ? (
                         <Badge variant="outline" className="ml-2">
                           sem margem
+                        </Badge>
+                      ) : i.marginPct != null ? (
+                        <Badge variant="outline" className="ml-2">
+                          margem {formatNum(i.marginPct)}%
                         </Badge>
                       ) : null}
                     </TableCell>

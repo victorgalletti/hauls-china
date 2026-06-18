@@ -74,4 +74,5 @@ model PurchaseItem {
   // Whether the markup/margin applies to this item (e.g. on for items resold
   // to others, off for your own items).
   applyMargin Boolean @default(true)
+  marginPct   Float? // optional per-item margin %; null = use the purchase margin
 }
